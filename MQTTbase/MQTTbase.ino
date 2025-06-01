@@ -13,21 +13,30 @@
 #include <PubSubClient.h>
 
 // Adjust to personal settings to connect to your Wifi & MQTT server IP
-const char* ssid = "MqttTest"; // Wifi Name
-const char* password = "MqttTest"; // Wifi Pass
+const char* ssid = "MQTT_Test"; // Wifi Name
+const char* password = "MQTT_Test"; // Wifi Pass
 const char* mqtt_server = "192.168.178.96"; // MQTT-Server IP
-char* hello_message = "Hello from ESP32-W!"; // Hello msg
 const char* client_name = "ESP_32-W"; // Unique Name of micro controller, as it will be seen on the mqtt network
-char* topic = "topic"; // Default MQTT topic to subscribe, will change according to later assignment
+
+char* hello_message = "Hello from ESP32-W!"; // Hello msg or test msg
+const char* topic = "topic/temp"; // Default MQTT topic to publish to
 
 WiFiClient espClient;
 PubSubClient mqttclient(espClient);
 
+// Construct the default topic to subscribe to from the client_name and * topic
+char* getDefaultTopic() {
+  static char defaultTopicBuffer[100];  // Static buffer persists between function calls
+  // Concatinate char* to build the topic-id being in the form: client_name/#
+  snprintf(defaultTopicBuffer, sizeof(defaultTopicBuffer), "%s/#", client_name);
+  return defaultTopicBuffer;
+}
+
 // Construct the topic id from the current topic and the client_name
-char* getTopicId() {
+char* getTopicId(char* subTopic) {
   static char topicBuffer[100];  // Static buffer persists between function calls
   // Concatinate char* to build the topic-id being in the form: client_name/topic
-  snprintf(topicBuffer, sizeof(topicBuffer), "%s/%s", client_name, topic);
+  snprintf(topicBuffer, sizeof(topicBuffer), "%s/%s/%s", client_name, topic, subTopic);
   return topicBuffer;
 }
 
@@ -40,8 +49,8 @@ void reconnect() {
     // If it worked, connect to previous topic again
     if (mqttclient.connect(client_name)) {
       Serial.println("connected");
-      // Subscribe to topic
-      subscribe(topic);
+      // Subscribe to topic & all sub topics of the client_name topic
+      subscribe(getDefaultTopic());
 
     // Else wait and try again
     } else {
@@ -55,32 +64,35 @@ void reconnect() {
 
 // Subscribe to a new topic
 void subscribe(char* newTopic) {
-  // String compare, if the newTopic is not empty (only used for setup)
-  if (strcmp(newTopic, "") == 0) {
-    mqttclient.unsubscribe(getTopicId());
-    topic = newTopic;
-  }
-  mqttclient.subscribe(getTopicId());
+  mqttclient.subscribe(newTopic);
 }
 
 // Send a message to the current topic
 void send(char* message) {
-  mqttclient.publish(getTopicId(), message);
+  char payload[256];
+  // Tag with client name to filter own messages
+  snprintf(payload, sizeof(payload), "[%s] %s", client_name, message);
+  mqttclient.publish(getTopicId(""), payload);
 }
 
 // Method that runs after a message was received on mqtt
 void callback(char* topic, byte* message, unsigned int length) {
-  Serial.print("Message arrived on topic: ");
-  Serial.print(topic);
-  Serial.print(". Message: ");
-
   // Get received message as string
   String messageTemp;
   for (int i = 0; i < length; i++) {
-    Serial.print((char)message[i]);
     messageTemp += (char)message[i];
   }
-  Serial.println();
+
+  // Filter out own messages
+  if (messageTemp.startsWith("[" + String(client_name) + "]")) {
+    return;
+  }
+
+  // Otherwise process message
+  Serial.print("Received from topic ");
+  Serial.print(topic);
+  Serial.print(": ");
+  Serial.println(messageTemp);
 
   // Do stuff with the topic
   //if (String(topic) == "topic") {
