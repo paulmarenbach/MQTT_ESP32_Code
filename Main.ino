@@ -1,6 +1,6 @@
 /*
   Please download and install these libs to upload & run the programm successfully:
-  Installation in Arduino IDE: Sketch -> Include Lib. -> Add .zip
+  Installation in Arduino IDE: Sketch -> Include Lib. -> Add .zip from these two sources.
   https://github.com/mathieucarbou/AsyncTCP
   https://github.com/knolleary/pubsubclient
 
@@ -13,13 +13,13 @@
 #include <PubSubClient.h>
 
 // Adjust to personal settings to connect to your Wifi & MQTT server IP
-const char* ssid = "MQTT_Test"; // Wifi Name
-const char* password = "MQTT_Test"; // Wifi Pass
-const char* mqtt_server = "192.168.178.96"; // MQTT-Server IP
-const char* client_name = "ESP_32-W"; // Unique Name of micro controller, as it will be seen on the mqtt network
+const char* ssid = ""; // Wifi Name
+const char* password = ""; // Wifi Pass
+const char* mqtt_server = ""; // MQTT-Server IP 
+const char* client_name = ""; // Unique Name of micro controller, as it will be seen on the mqtt network
 
-char* hello_message = "Hello from ESP32-W!"; // Hello msg or test msg
-const char* topic = "topic/temp"; // Default MQTT topic to publish to
+char* hello_message = ""; // Hello msg or test msg
+const char* topic = ""; // Default MQTT topic to publish to
 
 WiFiClient espClient;
 PubSubClient mqttclient(espClient);
@@ -38,6 +38,15 @@ char* getTopicId(char* subTopic) {
   // Concatinate char* to build the topic-id being in the form: client_name/topic
   snprintf(topicBuffer, sizeof(topicBuffer), "%s/%s/%s", client_name, topic, subTopic);
   return topicBuffer;
+}
+
+// Remove signature tag (i.e. "[ESP_32-A] ")
+String removeSignature(String message) {
+  int tagEnd = message.indexOf("] ");
+  if (message.startsWith("[") && tagEnd != -1) {
+    message = message.substring(tagEnd + 2); // Skip "] "
+  }
+  return message;
 }
 
 // Reconnect logic
@@ -68,11 +77,11 @@ void subscribe(char* newTopic) {
 }
 
 // Send a message to the current topic
-void send(char* message) {
+void send(char* message, char* subtopic) {
   char payload[256];
   // Tag with client name to filter own messages
   snprintf(payload, sizeof(payload), "[%s] %s", client_name, message);
-  mqttclient.publish(getTopicId(""), payload);
+  mqttclient.publish(getTopicId(subtopic), payload);
 }
 
 // Method that runs after a message was received on mqtt
@@ -126,7 +135,7 @@ void setup(void) {
   mqttclient.setCallback(callback);
 
   // Publish to Topic on broker
-  send(hello_message);
+  send(hello_message, "");
 }
 
 void loop(void) {
@@ -136,7 +145,7 @@ void loop(void) {
   }
 
   // Do stuff
-  send(hello_message);
+  //send(hello_message, "");
 
   // Keep alive-ping etc. for MQTT communication
   mqttclient.loop();
